@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Stansteel SACCO (PWA Shell)</title>
+
+  <!-- PWA manifest -->
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- Theme for mobile -->
+  <meta name="theme-color" content="#007ACC" />
+  <style>
+    :root{--bg:#f5f7fb;--accent:#007ACC;--txt:#0b1220}
+    html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;color:var(--txt)}
+    .app{display:flex;flex-direction:column;height:100vh}
+    header{background:linear-gradient(90deg,var(--accent),#005fa0);color:white;padding:12px 16px;display:flex;align-items:center;gap:12px}
+    header img{width:36px;height:36px;border-radius:8px;object-fit:cover}
+    header h1{font-size:16px;margin:0}
+    #controls{margin-left:auto;display:flex;gap:8px}
+    button{background:white;border:0;padding:8px 10px;border-radius:8px;cursor:pointer}
+    .content{flex:1;background:var(--bg);display:flex;align-items:stretch;justify-content:stretch}
+    iframe{border:0;width:100%;height:100%}
+    .center{margin:auto;text-align:center;padding:24px}
+    .hidden{display:none}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <img src="/icons/icon-192.png" alt="icon" />
+      <h1>Stansteel SACCO</h1>
+      <div id="controls">
+        <button id="installBtn" class="hidden">Install</button>
+        <button id="openBtn">Open web app</button>
+      </div>
+    </header>
+
+    <main class="content" id="main">
+      <!-- Primary attempt: embed in iframe -->
+      <iframe id="appFrame" src="https://script.google.com/macros/s/AKfycbzBNu69n5ajECgFR_ZcxSGa6a8LnSYb87ALGTNALHIt3ygwkk7huB7aENfLOHOh4KRSYQ/exec"
+              title="Stansteel web app"></iframe>
+
+      <!-- Fallback UI (shown if iframe can't load) -->
+      <div id="fallback" class="center hidden">
+        <p>Unable to embed the web app (this can happen if the remote site disallows framing).</p>
+        <p><a id="openLink" href="#" target="_blank" rel="noopener">Open the web app in a new tab</a></p>
+        <p>Or install this as an app and it will open the web app in your device's browser.</p>
+      </div>
+    </main>
+
+    <noscript style="padding:12px;text-align:center;background:#ffefef;color:#8a1f1f">
+      This app needs JavaScript to function properly.
+    </noscript>
+  </div>
+
+<script>
+const APP_URL = "https://script.google.com/macros/s/AKfycbzBNu69n5ajECgFR_ZcxSGa6a8LnSYb87ALGTNALHIt3ygwkk7huB7aENfLOHOh4KRSYQ/exec";
+const installBtn = document.getElementById('installBtn');
+const openBtn = document.getElementById('openBtn');
+const appFrame = document.getElementById('appFrame');
+const fallback = document.getElementById('fallback');
+const openLink = document.getElementById('openLink');
+
+openLink.href = APP_URL;
+
+// If the iframe fails due to CSP/X-Frame-Options, show fallback and enable top-level redirect
+function showFallback() {
+  appFrame.classList.add('hidden');
+  fallback.classList.remove('hidden');
+}
+
+// Try to detect iframe load problems: set a timeout and also listen for message from iframe (optional)
+let loadTimeout = setTimeout(() => {
+  // If still visible but maybe blocked, show fallback
+  if (!appFrame.complete && appFrame.clientHeight > 0) {
+    // we'll still show fallback so user can open
+    showFallback();
+  }
+}, 3000);
+
+// Also listen for iframe error events where supported
+appFrame.addEventListener('error', () => showFallback());
+// Some browsers won't fire iframe error - attempt to ping by writing and catching exception is not possible cross-origin
+
+// If user clicks "Open web app", redirect top-level (works if iframe blocked)
+openBtn.addEventListener('click', () => {
+  window.location.href = APP_URL;
+});
+
+/* Install prompt handling */
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBtn.classList.remove('hidden');
+});
+
+installBtn.addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const choice = await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  installBtn.classList.add('hidden');
+});
+
+/* Register service worker */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js').then(reg => {
+      console.log('SW registered', reg);
+    }).catch(err => console.error('SW reg failed', err));
+  });
+}
+</script>
+</body>
+</html>
